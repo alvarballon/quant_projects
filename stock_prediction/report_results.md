@@ -23,37 +23,7 @@ header-includes:
     - \definecolor{bordercolor}{RGB}{221,221,221}
 ---
 
-## A. Explanation of entropy in classification
-
-In a binary classification problem, the entropy $S$ of a partition $\Pi$ is defined as
-
-$$
-S = -p \log(p) - (1-p)\log(1-p),
-$$
-
-where $p$ is the fraction of elements in $\Pi$ that are of class $1,$ and $1-p$ is the fraction of class $0.$  We differentiate the entropy with respect to $p$ to find the stationary points:
-
-$$
-S'(p) = -\log(p) + \log(1-p) = 0.
-$$
-
-Equating the logarithms, we must have $p = 1 - p,$ so $p = 1/2$ is a stationary point. Differentiating once again gives
-
-$$
-S''(p) = -\frac{1}{p} - \frac{1}{1- p} < 0,
-$$
-
-since $0 \leq p \leq 1.$ Therefore, $p = 1/2$ yields a maximum for the entropy function. As a consequence, 
-
-**(a) High entropy means the partitions are pure.** This statements is **false**. Entropy reaches a maximum when the number of elements of different classes is balanced within the partition. This is equivalent to the partition being impure. When a partition is pure, we expect $p = 0$ or $p = 1$. In either case,
-
-$$
-\lim_{p\rightarrow 0} S(p) = 0 = \lim_{p\rightarrow 1} S(p). 
-$$
-
-**(b) High entropy means the partition are impure.** This statement is **true.** As shown above, when partitions are impure (classes are closed to balanced), the entropy achieves a maximum.
-
-## B. Feature selection using the funnelling approach
+## A. Feature selection using the funnelling approach
 
 In this report, we aim to predict up and down movements of an asset's price from past information. The ticker for the chosen stock is `CSU.TO`, associated with Constellation Software, a Canadian company that has seen unprecedented growth in the last decade. The 5-year data (up until May 9th 2025) was retrieved using the `yfinance` library and stored in the attached `csu.csv` file. It is then imported as a pandas dataframe named `csu`.
 
@@ -116,7 +86,7 @@ csu = csu.dropna() # Drop all NaN values
 y = np.where(csu["Log Returns"].shift(-1) > quantile_25, 1, 0)
 ```
 
-### B.1 Filtering methods
+### A.1 Filtering methods
 
 The funnelling approach for feature selection begins with the implementation of filtering methods. A first filter must examine multicollinearity. If one feature can be expressed as a linear combination of others, they are redundant and some can be discarded. Is is evident that features such as `Open`, `Close`, and `Open - Close` are are perfectly correlated. Preliminarily, we can discard the `Close` and `Low` features. A similar argument can be made for the Bollinger bands, which are calculated from the volatility. Thus, we also abandon the `Quarter Upper Band` features. We also expect the $5$, $10,$ and $20$ day momenta, averages, and volatilities to be somewhat correlated. Indeed, we will use feature selection to decide a priori which time period has a better predictive power. We will not combine features from different time windows.
 
@@ -137,6 +107,8 @@ def vif(X):
 
 A first analysis showed that the `High` and `Open` features are also highly correlated with each other and also with the expected moving average. We discard these two features. The three final tables with VIF factors for the three different time periods ($d = 5, 10, 20$ days)  are shown below.
 
+$$
+
 \begin{center}
 \begin{table}[h]
 \begin{tabular}{|l|r|l|r|l|r|}
@@ -153,6 +125,8 @@ Open-Close        & 2.612904                                                    
 \end{tabular}
 \end{table}
 \end{center}
+
+$$
 
 As we see, the multicollinearity in this set of features is not extremely high. Further filtering can be done via Analysis of Variance (ANOVA) methods, which are known to be better suited for binary classification given numerical features. These find correlations of the features and the associated class via an univariate F-test, returning scores representing the significance of each feature. The specific method `SelectKBest` is native to `scikit-learn`. Based on the exercise sheet:
 
@@ -173,6 +147,7 @@ for f, s in zip(X2_df.columns, skb.scores_):
 
 The results of this analysis are shown in the table below. 
 
+$$
 \begin{center}
 \begin{table}[h]
 \begin{tabular}{|l|l|l|l|}
@@ -189,10 +164,11 @@ Open-Close        & 6.36             & 20d Momentum                             
 \end{tabular}
 \end{table}
 \end{center}
+$$
 
 We observe that the `High-Low` has low predictive power according to the F-score metric. Additionally, 10-day period metrics seem to score better on average. Overall, moving averages do not seem to be very predictive. We will keep these features for the time being and confirm whether they should be discarded using further methods.
 
-### B.2 Wrapper Methods
+### A.2 Wrapper Methods
 
 The method we will use for classifying up and down trends is the Gradient Boosting Classifying. Thus, we implement a wrapper method known as recursive feature elimination (RFE) based on this classifier to further narrow down features. RFE uses the underlying classifier using different subsets of features and measures the classfication accuracy. Then, it ranks the first $n$ features that resulted in higher accuracies. The method is build into `scikit-learn` as `feature_selection.RFE`. Drawing on the aforementioned exercise sheet, we adapt the code for our purposes.
 
@@ -238,7 +214,7 @@ A lower number represents a higher ranking. Here we made the decision now to foc
 3. To complete the set of six features, we keep `Open-Close` and `High-Low`, which are next in the ranking. 
 4. We discard moving averages as a predicitive feature.
 
-### B.3 Embedded methods
+### A.3 Embedded methods
 
 To further confirm our choice of features, we use an embedded method known as Feature Importance. It calculates a  hierarchical scoring method index by running the classifier using different thresholds. This is implemented on `scikit-learn` as the `feature_importances_` attribute of the `GradientBoostingClassifier`. 
 
@@ -258,6 +234,7 @@ list(zip(X3_df.columns, gbr.feature_importances_))
 
 The scores for the six selected features are shown in the table below.
 
+$$
 \begin{center}
 \begin{table}[h]
 \begin{tabular}{|l|l|}
@@ -273,6 +250,7 @@ Open-Close        & 0.150               \\ \hline
 \end{tabular}
 \end{table}
 \end{center}
+$$
 
 The Feature Importance method classifies 10 day momentum as the most relevant features. All other chosen features score lower, but they are assigned similar importances. 
 
@@ -285,13 +263,13 @@ In light on the results of this funnelling approach, we keep the following featu
 - 10-day Momentum
 - 10-day Volatility
 
-## C. Model Building, Tuning, and Evaluation
+## B. Model Building, Tuning, and Evaluation
 
-### C.1 Build a model to predict positive market moves. 
+### B.1 Build a model to predict positive market moves. 
 
 As explained in the previous section, the aim of our Machine Learning moel is to predict uptrends, where an uptrend is defined as a logarithmic return greater than $Q_{25} = 0.47\%$. A certain day is assigned the label $1$ if the next day is an uptrend. With the features chosen, we display the first few data points.
 
-![](final_features.png)
+![](images/final_features.png)
 
 The model requested is Gradient Boosting, which initially uses decision trees of depth `max_depth`, then uses the gradient descent of the loss function with a given `learning_rate` to correct the error made by the trees. There are `n_estimators` "boosting" steps to further correct the error. First, we run an iteration with the following hyperparameter choices:
 
@@ -320,7 +298,7 @@ The reason we prefer the recall as a performance metric is because we will consi
 ConfusionMatrixDisplay(confusion_matrix(y_test, y_pred)).plot()
 ```
 
-![](confusion_matrix_1.png)
+![](images/confusion_matrix_1.png)
 
 We observe that the model predicts more false positives than negatives. However, since there are more negative cases, this is to be expected. The fraction of correctly classified positive instances is, in fact, larger than the fraction of incorrectly classified positives. This can be seen in more detail in the ROC curve.
 
@@ -341,7 +319,7 @@ plt.grid()
 plt.show()
 ```
 
-![](roc_curve_1.png)
+![](images/roc_curve_1.png)
 
 The curve shows that the classification is slightly better than chance, with the true positive rate being larger than the false positive rater for many possible thresholds, matching our previous observation. We can summarize the results of the model using a `classification_report`.
 
@@ -362,7 +340,7 @@ weighted avg       0.52      0.54      0.52       247
 
 Indeed, the performance for true positives leaves a lot to be desired. Such a low recall indicates that the majority of instances labelled as positive are false positives. Moreover, we can see in the confusion matrices that the majority of upwards movements are missed by the model.
 
-### C.2 Hyperparameter Tuning
+### B.2 Hyperparameter Tuning
 
 Now that we have built the skeleton of the model and obtained a sense of its performance, we proceed to build a family of Gradient Boosting Classifiers with different hyperparameters. Our choices are
 
@@ -397,7 +375,7 @@ print(best_params)
 
 In our case, `n_estimators = 50`, `max_depth = 3`, and `learning_rate = 0.4`. 
 
-### C.3 Model prediction quality
+### B.3 Model prediction quality
 
 As in C.1, we can find the test recall score
 
@@ -413,7 +391,7 @@ which, in this case, is $0.35$, a substantial increase over $0.28$ from the prev
 ConfusionMatrixDisplay(confusion_matrix(y_test, y_pred_best)).plot()
 ```
 
-![](confusion_matrix_2.png)
+![](images/confusion_matrix_2.png)
 
 which shows a decrease in incorrect classification and an increase in recall and overall true positive identification. However, it is still the case that most instances that are classified as an upwards movement are false positives, and most of the true uptrend is missed.
 
@@ -438,7 +416,7 @@ plt.grid()
 plt.show()
 ```
 
-![](roc_curve_2.png)
+![](images/roc_curve_2.png)
 
 Unfortunately, the area under the ROC remains unchanged, meaning that the model does not perform much better even if we change thresholds. This is not surprising, however, since the hyperparameters of the best model do not differ much from the arbitrarily selected model.
 
