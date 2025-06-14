@@ -1,2 +1,2 @@
 # quant_projects
-Quantitative finance projects
+brief quantitative finance projects
